@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# copy .txt files from sites path to AWS instance(s)
+
+#### --- AWS EC2 instance
+
+#rsync -az \
+#	-e 'ssh -i /Users/Mike/data/aws/recent-sites/recent-sites-admin.pem' \
+#	/Users/Mike/Desktop/sites/ \
+#	ec2-user@ec2-35-176-165-238.eu-west-2.compute.amazonaws.com:/home/ec2-user/recent-sites-txt2lists/data
+
+
+#### --- AWS Elastic Beanstalk
+rsync -az \
+	-e 'ssh -i /Users/Mike/data/aws/recent-sites/recent-sites-admin.pem' \
+	/Users/Mike/Desktop/sites/ \
+	ec2-user@ec2-35-178-94-8.eu-west-2.compute.amazonaws.com:~/

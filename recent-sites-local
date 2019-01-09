@@ -1,0 +1,4 @@
+#!/bin/bash
+
+#cp $HOME/Desktop/sites/*.txt $HOME/data/builds/recent-sites-txt2lists/app/data
+rsync -a --delete $HOME/Desktop/sites/ $HOME/data/builds/recent-sites-txt2lists/data

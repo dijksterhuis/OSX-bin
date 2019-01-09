@@ -1,0 +1,14 @@
+#!/usr/bin/osascript
+
+tell application "iTunes"
+	activate
+	set ts to playlist "James Holden DJ Kicks"
+	play ts
+end tell
+
+set i to 0
+repeat while i < 90
+	set volume without output muted output volume i
+	delay 2
+	set i to i + 1
+end repeat
