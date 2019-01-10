@@ -11,6 +11,9 @@ from datetime import datetime as dt
 from collections import OrderedDict
 
 class dataProcessor:
+    """
+    etl for the metadata
+    """
     def __init__(self, entry):
         self.entry = entry
         self.date_published = None
@@ -90,6 +93,9 @@ class dataProcessor:
             )
 
 class DB:
+    """
+    initialise sqlite3 db in dl_dir and insert metadata about paper into tables for later analysis
+    """
     def __init__(self, dl_dir):
         """
         Initialise a metadata database using sqlite3
@@ -135,6 +141,9 @@ class DB:
         self.db_conn.close()
 
 class pdfWriter:
+    """
+    get the pdf file content from arxiv then write it safely to the desired dir
+    """
     def __init__(self, link, p_date, fname, dl_dir):
         self.data = None
         self.fname = fname
@@ -170,29 +179,25 @@ class pdfWriter:
         logs = Logging(self.fname, self.date_dir)
         if self.fname is not None and self.fname not in self.existing_files:
             r = get_request(self.url)
-            if r is None:
-                logs.request_error()
-            else:
-                self.data = r.content
-                self.write_binary_content()
-                logs.success()
-                time.sleep(3)
+            self.data = r.content
+            self.write_binary_content()
+            logs.success()
+            time.sleep(3)
         elif self.fname is None or self.fname in self.existing_files:
             logs.skipped()
         else:
             logs.other()
     
 class Logging:
+    """
+    Logger class that just prints to stdout.
+    """
     def __init__(self, pdf_id, data_dir):
         self.pdf_id = pdf_id
         self.data_dir = data_dir
     
     def success(self):
         output_string = "Saved {} to {}".format(self.pdf_id, self.data_dir)
-        print(dt.now(), output_string)
-    
-    def requests_error(self):
-        output_string = "There was some sort of error with the request for {}".format(self.pdf_id)
         print(dt.now(), output_string)
     
     def skipped(self):
@@ -208,20 +213,15 @@ def get_request(url):
     """
     try:
         r = requests.get(url)
-    except ConnectionResetError as e:
-        err = "arXiv have reset the connection. Must wait to do any more queries. {}".format(e)
-        print(dt.now(), err)
-        sys.exit(100)
     except Exception as e:
         err = "<get_requests> encountered an exception for: {} : {}".format(url,e)
         print(dt.now(), err)
-        sys.exit(100)
-        return None
+        sys.exit(1)
     else:
         if r.status_code != 200:
             err = "<get_requests> called the api, but got a non-200 status code for: {}".format(url)
             raise Exception(dt.now(), err)
-            sys.exit(100)
+            return None
         else:
             return r
 
@@ -229,20 +229,16 @@ def main(n=100, dl_dir = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"):
     """
     main runtime script
     """
-    
     category_searches = "search_query=cat:cs.CR+AND+%28cat:stat.ML+OR+cat:cs.LG+OR+cat:cs.CV+OR+cat:cs.AI%29"
-    
-    full_query = "{sq}&start={s}&max_results={n}&sortBy={sb}&sortOrder={so}".format(
-                                            sq=category_searches,
-                                            s=0,
-                                            n=n,
-                                            sb='submittedDate',
-                                            so='descending'
+    full_query = "{sq}&start={s}&max_results={n}&sortBy={sd}&sortOrder={so}".format(
+                                            sq=category_searches
+                                            , s=0
+                                            , n=n
+                                            , sd='submittedDate'
+                                            , so='descending'
                                         )
     arxiv_api_url = "http://export.arxiv.org/api/query?{query_string}".format(query_string=full_query)
-    
     search_data = xmltodict.parse(get_request(arxiv_api_url).text)
-    
     meta_db = DB(dl_dir)
     
     for entry in search_data['feed']['entry']:
