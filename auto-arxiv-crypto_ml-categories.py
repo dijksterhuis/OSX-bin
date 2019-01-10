@@ -2,28 +2,15 @@
 
 import requests
 import xmltodict
-import os
-import time
 import sqlite3
+import os
+import sys
+import time
 
 from datetime import datetime as dt
 from collections import OrderedDict
 
-NUMB_RESULTS = 1000
-
-SEARCH_QUERY_STRING = "search_query=cat:cs.CR+AND+%28cat:stat.ML+OR+cat:cs.LG%29"
-QUERY_STRING = "{sq}&start={s}&max_results={n}&sortBy={sb}&sortOrder={so}".format(
-                                        sq=SEARCH_QUERY_STRING,
-                                        s=0,
-                                        n=NUMB_RESULTS,
-                                        sb='submittedDate',
-                                        so='descending'
-                                    )
-ARXIV_API_URL = "http://export.arxiv.org/api/query?{query_string}".format(query_string=QUERY_STRING)
-
-DOWNLOAD_DIR = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"
-
-class ETL:
+class dataProcessor:
     def __init__(self, entry):
         self.entry = entry
         self.date_published = None
@@ -147,92 +134,117 @@ class DB:
     def close(self):
         self.db_conn.close()
 
+class pdfWriter:
+    def __init__(self, link, p_date, fname, dl_dir):
+        self.data = None
+        self.fname = fname
+        self.date_dir = dl_dir + p_date + "/"
+        self.path = self.date_dir + fname
+        self.url = link
+        self.existing_files = None
+    
+    def create_paths(self):
+        if not os.path.exists(self.date_dir):
+            os.mkdir(self.date_dir)
+    
+    def get_existing_files(self):
+        self.existing_files = os.listdir(self.date_dir)
+    
+    def write_binary_content(self):
+        """
+        Safely write binary file content.
+        """
+        if ".pdf" not in self.path:
+            self.path = self.path + ".pdf"
+        try:
+            with open(self.path, 'wb+') as f:
+                f.write(self.data)
+        except Exception as e:
+            print("<write_pdf> encountered an error: {err}".format(err=e))
+        else:
+            return True
+    
+    def get_pdf(self):
+        self.create_paths()
+        self.get_existing_files()
+        logs = Logging(self.fname, self.date_dir)
+        if self.fname is not None and self.fname not in self.existing_files:
+            self.data = get_request(self.url).content
+            self.write_binary_content()
+            logs.success()
+            time.sleep(3)
+        elif self.fname is None or self.fname in self.existing_files:
+            logs.skipped()
+        else:
+            logs.other()
+    
+class Logging:
+    def __init__(self, pdf_id, data_dir):
+        self.pdf_id = pdf_id
+        self.data_dir = data_dir
+    
+    def success(self):
+        output_string = "Saved {} to {}".format(self.pdf_id, self.data_dir)
+        print(dt.now(), output_string)
+    
+    def skipped(self):
+        output_string = "Skipped {} - pdf is either <None> or exists in {}".format(self.pdf_id, self.data_dir)
+        print(dt.now(), output_string)
+    
+    def other(self):
+        print("Did not save pdf for an uknown reason.")
+
 def get_request(url):
     """
     requests.get() with personalised error handling.
     """
     try:
-        r=requests.get(url)
+        r = requests.get(url)
     except Exception as e:
-        print("<get_requests> encountered an exception for: {api_url} : {err}".format(api_url=url,err=e))
-    if r.status_code != 200:
-        raise Exception("<get_requests> called the api, but got a non-200 status code for: {api_url}".format(api_url=url))
-    else: return r
-
-def parse_data(xml_data, parser = xmltodict.parse):
-    """
-    Parse xml data via the defined parser - default parser is xmltodict
-    """
-    parsed_data = parser(xml_data)
-    return parsed_data
-
-def generate_data_links(parsed_data):
-    """
-    Generator function to extract & transform necessary data from <dict>/<OrderedDict>
-    """
-    if not isinstance(parsed_data, OrderedDict) or not isinstance(parsed_data, OrderedDict):
-        raise TypeException("<generate_data_links> only accepts <OrderedDict> or <dict> types.")
+        err = "<get_requests> encountered an exception for: {} : {}".format(url,e)
+        print(dt.now(), err)
+        sys.exit(100)
     else:
-        for entry in parsed_data['feed']['entry']:
-            data = ETL(entry)
-            data.extract()
-            yield data.load()
+        if r.status_code != 200:
+            err = "<get_requests> called the api, but got a non-200 status code for: {}".format(url)
+            raise Exception(dt.now(), err)
+            sys.exit(100)
+        else:
+            return r
 
-def write_pdf(data, path):
-    """
-    Safely write binary file content.
-    """
-    if ".pdf" not in path:
-        path = path + ".pdf"
-    try:
-        with open(path, 'wb+') as f:
-            f.write(data)
-    except Exception as e:
-        print("<write_pdf> encountered an error: {err}".format(err=error))
-    else:
-        return True
-
-
-def main():
+def main(n=100, dl_dir = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"):
     """
     main runtime script
     """
     
-    meta_db = DB(DOWNLOAD_DIR)
-    search_data = parse_data(get_request(ARXIV_API_URL).text)
+    category_searches = "search_query=cat:cs.CR+AND+%28cat:stat.ML+OR+cat:cs.LG+OR+cat:cs.CV+OR+cat:cs.AI%29"
+    
+    full_query = "{sq}&start={s}&max_results={n}&sortBy={sb}&sortOrder={so}".format(
+                                            sq=category_searches,
+                                            s=0,
+                                            n=n,
+                                            sb='submittedDate',
+                                            so='descending'
+                                        )
+    arxiv_api_url = "http://export.arxiv.org/api/query?{query_string}".format(query_string=full_query)
+    
+    search_data = xmltodict.parse(get_request(arxiv_api_url).text)
+    
+    meta_db = DB(dl_dir)
     
     for entry in search_data['feed']['entry']:
         
-        entryETL = ETL(entry)
+        entryETL = dataProcessor(entry)
         entryETL.extract()
         tags = entryETL.load()
         
+        meta_db.insert_metadata(tags)
+        
         date = tags[0]
-        link, fname, title = tags[4:7]
+        link, fname = tags[4:6]
         
-        date_dir = DOWNLOAD_DIR + date + "/"
-        if not os.path.exists(date_dir):
-            os.mkdir(date_dir)
-        
-        existing_files = os.listdir(date_dir)
-        
-        if fname is not None and fname not in existing_files:
-            pdf_data = get_request(link).content
-            write_pdf(pdf_data, date_dir + fname)
-            meta_db.insert_metadata(tags)
-            print(dt.now(), "Saved {pdf_id} to {dl_dir}".format(pdf_id=fname, dl_dir=date_dir))
-            time.sleep(3)
-            
-        elif fname is None or fname in existing_files:
-            meta_db.insert_metadata(tags)
-            print(dt.now(), "Skipped {pdf_id} - download is either <None> or exists in {dl_dir}".format(\
-                                                            pdf_id=fname, dl_dir=date_dir)\
-                                                        )
-        
-        else:
-            print("Did not save pdf {pdf_id}/{title} for an uknown reason.".format(\
-                                                        pdf_id=fname, title=title)\
-                                                    )
+        pdf_getter = pdfWriter(link, date, fname, dl_dir)
+        pdf_getter.get_pdf()
     
     meta_db.close()
 
