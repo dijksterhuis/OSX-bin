@@ -169,10 +169,14 @@ class pdfWriter:
         self.get_existing_files()
         logs = Logging(self.fname, self.date_dir)
         if self.fname is not None and self.fname not in self.existing_files:
-            self.data = get_request(self.url).content
-            self.write_binary_content()
-            logs.success()
-            time.sleep(3)
+            r = get_request(self.url)
+            if r is None:
+                logs.request_error()
+            else:
+                self.data = r.content
+                self.write_binary_content()
+                logs.success()
+                time.sleep(3)
         elif self.fname is None or self.fname in self.existing_files:
             logs.skipped()
         else:
@@ -185,6 +189,10 @@ class Logging:
     
     def success(self):
         output_string = "Saved {} to {}".format(self.pdf_id, self.data_dir)
+        print(dt.now(), output_string)
+    
+    def requests_error(self):
+        output_string = "There was some sort of error with the request for {}".format(self.pdf_id)
         print(dt.now(), output_string)
     
     def skipped(self):
@@ -200,10 +208,15 @@ def get_request(url):
     """
     try:
         r = requests.get(url)
+    except ConnectionResetError as e:
+        err = "arXiv have reset the connection. Must wait to do any more queries. {}".format(e)
+        print(dt.now(), err)
+        sys.exit(100)
     except Exception as e:
         err = "<get_requests> encountered an exception for: {} : {}".format(url,e)
         print(dt.now(), err)
         sys.exit(100)
+        return None
     else:
         if r.status_code != 200:
             err = "<get_requests> called the api, but got a non-200 status code for: {}".format(url)
