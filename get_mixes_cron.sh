@@ -1,4 +1,6 @@
-wpath=$HOME/data/localjobs/mix-getter
+#!/usr/bin/env bash
+
+wpath=$HOME/data/local-jobs/mix-getter
 datadir=$wpath/mixes
 dldir=$datadir/dls
 dimg="dijksterhuis/youtube-dl-audio:mixes"
