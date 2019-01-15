@@ -182,7 +182,7 @@ class pdfWriter:
             self.data = r.content
             self.write_binary_content()
             logs.success()
-            time.sleep(3)
+            time.sleep(20) # should get this from robots.txt!
         elif self.fname is None or self.fname in self.existing_files:
             logs.skipped()
         else:
@@ -211,8 +211,10 @@ def get_request(url):
     """
     requests.get() with personalised error handling.
     """
+    
+    headers = {"From": "mrobeson@dundee.ac.uk", "User-Agent" : "mrobeson@dundee.ac.uk"}
     try:
-        r = requests.get(url)
+        r = requests.get(url, headers=headers)
     except Exception as e:
         err = "<get_requests> encountered an exception for: {} : {}".format(url,e)
         print(dt.now(), err)
@@ -225,7 +227,7 @@ def get_request(url):
         else:
             return r
 
-def main(n=100, dl_dir = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"):
+def main(n=50, dl_dir = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"):
     """
     main runtime script
     """
@@ -250,7 +252,8 @@ def main(n=100, dl_dir = "/Users/Mike/data/data-files/auto-arxiv/CS_ML/"):
         meta_db.insert_metadata(tags)
         
         date = tags[0]
-        link, fname = tags[4:6]
+        link = tags[4].replace('arxiv.org','export.arxiv.org')
+        fname = tags[5]
         
         pdf_getter = pdfWriter(link, date, fname, dl_dir)
         pdf_getter.get_pdf()
