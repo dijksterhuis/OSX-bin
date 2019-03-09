@@ -1,0 +1,16 @@
+#!/bin/bash
+
+
+if [ -z "${1}" ]
+then
+    PTH="./"
+else
+    PTH="${1}"
+fi
+
+if [ -f "${PTH}" ]
+then
+    cat "${PTH}"
+else
+    ls -FG "${PTH}"
+fi

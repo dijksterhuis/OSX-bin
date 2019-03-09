@@ -1,3 +1,0 @@
-#!/bin/bash
-
-scp -i /Users/Mike/data/aws/recent-sites/recent-sites-kp.pem /Users/Mike/Desktop/sites/*.txt ec2-user@ec2-35-177-103-205.eu-west-2.compute.amazonaws.com:/home/ec2-user/recent-sites-txt2lists/app/data
